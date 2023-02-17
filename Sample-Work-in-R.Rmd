@@ -1,0 +1,368 @@
+---
+title: "Sample Work in R"
+author: "Robin Yousef"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+Hello, Welcome to my sample work I've done in R. Here, I've done some general work providing code, visualization, and some interpretation/worded answers.
+
+You can also visit my GitHub (<https://github.com/robinyousef>) where I posted the work I've done in Python.
+
+Thanks for reading!
+
+## Required packages
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+# Packages
+pacman::p_load(
+  estimatr,
+  fixest,
+  modelsummary,
+  margins,
+  wooldridge,
+  AER,
+  kableExtra,
+  tidyverse,
+  haven
+)
+
+# Set the graphical theme
+ggplot2::theme_set(ggplot2::theme_light())
+```
+
+## Section 1: Political Polarization 
+
+This dataset is from Voteview, a website by political scientists Keith Poole and Howard Rosenthal that freely provides information on congressional roll call votes in the United States. The data goes back to the first U.S. congress in 1789, and includes votes from both the Senate and the House of Representatives. In addition the the votes themselves, Voteview's datasets include indicators of politicians' ideological positions, which have been estimated using NOMINATE. See their webpage for additional information.
+
+#Creating data frame called raw from the url given below.
+
+```{r}
+
+raw <- read.csv("https://voteview.com/static/data/out/members/HSall_members.csv")
+
+```
+
+#### Q2. Subsetting the data
+
+A)  Filter the data so that chamber does not equal 'President'.
+B)  Filter the data so that party_code is in the list c(100,200).
+C)  Filter the data so that only values of congress greater than 45 are retained.
+
+```{r}
+
+df <- raw %>% 
+  filter(chamber != "President", 
+         party_code %in% c(100,200 ),
+         congress > 45)
+
+nrow(df)
+ncol(df)
+dim(df)
+dim(df)[]
+```
+
+#### Q3. Mutating
+
+A)  Create a variable called year that is equal to 1789 + 2 \* (congress-1).
+
+B)  party_code is numeric and contains values 100 (Democrats) or 200 (Republicans). Create a variable called party that is a factor with the labels "Democrats" or "Republicans".
+
+C)  Create a dummy variable for 'moderate' called moderate if the variable nominate_dim1 takes on values between (-0.5 to +0.5).
+
+```{r}
+df <- df %>%  
+  mutate(year = 1789 + 2 * (congress-1),
+         party = factor(ifelse(party_code == 100, "Democrats", "Republicans"), labels = c("Democrats", "Republicans")),
+         moderate = ifelse(nominate_dim1> -0.5 & nominate_dim1 < 0.5, 1, 0))
+```
+
+#### Q4. How many moderates are there in the data?
+
+```{r}
+sum(df$moderate == 1, na.rm=T)   # The sum() function to count the number of rows in the data frame df where the value of the variable "moderate" is equal to 1. The na.rm=T option tells R to remove any missing values when counting.
+
+# how many moderates in each party?
+with(df, 
+     table(moderate, party))
+
+
+```
+
+#### Q5. Data visualization
+
+A)  Create a data frame called fig that contains the mean of nominate_dim1 and moderate by year, chamber, and party using the combination of group_by() and summarise(). Give mean if nominate_dim1 the variable name index, call the mean of moderate, moderate.
+B)  Filter for rows since the year 1900.
+
+```{r}
+fig <- df %>% 
+  group_by(year, chamber, party) %>% 
+  summarise(index = mean(nominate_dim1, na.rm = T),
+            moderate = mean(moderate, na.rm = T)) %>% 
+  filter(year > 1900)
+```
+
+#### Q6. Within and between party views
+
+A)  Filter df (but do not write over df) so that it contains the years 1971,1981,1991,2001,2011, and 2019,
+B)  Filter df so that it contains data on only the House.
+C)  Plot the density of noninate_dim1
+D)  Set fill aesthetic to party
+E)  facet_wrap by year
+F)  Set alpha to .5
+G)  label your figure with appropriate y, x and title labels using labs().
+
+```{r}
+
+df %>% 
+  filter(year %in% c(1971,1981,1991,2001,2011,2019),
+         chamber == "House") %>% 
+  ggplot(aes(x = nominate_dim1, fill = party)) + 
+  geom_density(alpha = 0.5) +
+  facet_wrap(~year) + 
+  labs(
+    y = "Density",
+    x = "Political Position",
+    title = "Distribution of Political Positions within the Party by Year"
+  )
+
+```
+
+## Section 2: Continuation of using R
+
+#### Q1. 
+
+Create a vector called vec with the numbers 2.5 to 97.5 in increments of 5, and print to screen the 1st and last element [Hint: use the function seq() to create the sequence, see ?seq].
+
+```{r}
+# create vector
+vec <- seq(2.5, 97.5, by = 5)
+#Length of vector 
+length(vec)
+
+# Print first and last element
+cat("The first element of vec is:", vec[1], "\n")
+cat("The last element of vec is:", vec[length(vec)])
+```
+
+#### Q2. 
+
+Create a new vector called probs by dividing vec by 100. Notice that every element is divided by 100.
+
+```{r}
+probs <- vec/100 
+probs
+```
+
+#### Q3. 
+
+Create a vector called x that is 10000 random draws from the standard normal distribution, using the function rnorm(). Use the function quantile() to find the quantiles of the distribution, using the first and last element of the vector probs you created above. Call this object crit.val
+
+```{r}
+x <- rnorm(10000, 0, 1)
+crit.val <- quantile(vec, probs = 0.025,0.975)
+crit.val 
+```
+
+#### Q4. 
+
+Convert your vector x into a data frame called draws. Create a dummy variable called large.draw if x \> 1.96 using the function ifelse(). Calculate the mean of large.draw. Plot the density of x, and add a layer with two vertical lines using the crit.val object you created above. In a few sentences, relate the object crit.val, the mean of large.draw, and the density you created. How are they all related?
+
+```{r}
+
+# convert to data frame
+draws <- data.frame(x)
+
+# add dummy variable
+draws <- draws %>% 
+  mutate(large.draw = ifelse(x > 1.96,1,0))
+
+# find mean of large.draw
+mean(draws$large.draw)
+  
+# Plot density of x
+ggplot(draws, 
+       aes(x = x)) + 
+  geom_density(fill = "steelblue", 
+               alpha = .5) + 
+  geom_vline(xintercept = crit.val)
+```
+
+The crit.val contain the observed quantiles of the simulated draws from the normal distribution. These should be close to -1.96 and 1.96. crit.val is calculated as the largest 5 percent (in absolute value) of the draws. Theoretically, in large enough draws from the standard normal, 5 percent of the most extreme should be beyond c(-1.96,1.96). In this specific case r round(d, digits=2) were extremely large, which should be close to 2.5 percent.
+
+#### Q5. 
+
+Below is a randomly generated data frame of 145 student grades in a hypothetical module in this course. All grades are in percentage points. Cut and paste this code into your .rmd file and then:
+
+A)  mutate to add a variable called course_work which is the average of Assignments and Quizzes.
+
+B)  create a dummy variable called threshold if a student got at least a B (70 percent) on the exam,
+
+C)  The create another variable called module_grade based on the syllabus's module grade formula.
+
+D)  Plot the module grade against the exam grade using ggplot2.
+
+```{r}
+# set up data
+fake.grades <- tibble(Exam = runif(145, 45, 100),
+                          Assignments =  runif(145, 45, 100),
+                          Quizzes =  runif(145, 45, 100)) 
+
+fake.grades <- fake.grades %>% 
+  mutate(course_work = Assignments *1/2 + Quizzes *1/2,
+         threshold = ifelse(Exam > 70,1,0),
+         module_grade = ifelse(threshold==1,
+                               .6*Exam + .2 * course_work * 2,
+                               .8*Exam + .1 * course_work * 2),
+         module_grade = ifelse(threshold == 1 & module_grade < 70, 70, module_grade ),
+         module_grade = ifelse(threshold == 0 & module_grade > 70, 70, module_grade ))
+
+ggplot(fake.grades, 
+       aes(x = Exam,
+           y = module_grade,
+           color = factor(threshold))) + 
+  geom_point()
+
+```
+
+## Section 3: RSP
+
+Encouraging people to save for retirement is major goal of policy makers. There are two basic, main ways of saving for retirement. Through an employer, using an employer retirement savings program (RSP), or privately, using an individual retirement savings account. Since employers often contribute to a RSP plan, this is thought of as an attractive way to save. For example, at York, professors are required to contribute to their retirement funds and the employer matches the professors contributions. In this question, we ask whether working for an employer with a retirement savings program (RSP) increases overall net wealth of individuals, (NW).
+
+| **Variable Name** | **Definition**                     |
+|-------------------|------------------------------------|
+| RSP               | =1 if employer has a RSP program   |
+| inc               | annual income, \$1000s             |
+| marr              | =1 if married                      |
+| male              | =1 if male respondent              |
+| age               | in years                           |
+| fsize             | family size                        |
+| NW                | net total fin. assets, \$1000      |
+| pira              | =1 if have private savings account |
+
+#### Q1. Perform the following data management tasks:
+
+A)Load the data to an object called df
+
+B)Filter the data to include only observations where fsize is equal to 1.
+
+C)Create a variable called age_sq that is the square of age, and simularly for inc_sq, the square of inc.
+
+```{r}
+saving <- read_csv("saving.csv") 
+df <- saving 
+df <- df %>% 
+  filter(fsize== 1) %>% 
+  mutate(age_sq = age^2,
+         inc_sq = inc^2)
+
+mean(df$inc, na.rm = T)
+
+```
+
+#### Q2. 
+
+A) What is the average income in this sample?
+
+B) Who has more net wealth, men or women?
+
+C) How many individuals in this data have private savings accounts?
+
+```{r}
+mean(df$inc, na.rm = T)
+``` 
+
+```{r}
+mean(df$inc[df$male==1], na.rm = T) - mean(df$inc[df$male==0], na.rm = T)
+``` 
+
+```{r}
+sum(df$pira, na.rm=T)
+```
+
+Solution:
+
+A)What is the average income in this sample? 28.8
+
+B)Who has more net wealth, men or women? men save 2.72 more than women.
+
+C)How many individuals in this data have private savings accounts? 221 have private savings accounts.
+
+Q3. Create a regression table with the following columns: NW on RSP, NW on RSP and inc, NW on RSP and all the other variables. make sure your regression table uses standard errors that are robust to heterskedasticity.
+
+```{r}
+models <- list(
+  lm(NW ~ RSP, data = df),
+  lm(NW ~ RSP + inc, data = df),
+  lm(NW ~ RSP + inc + inc_sq + marr + male + age + age_sq + pira, data = df)
+)
+
+modelsummary(models,
+             vcov = "robust",
+             stars = T,
+             gof_omit = "[^R2|R2 Adj.|Num.Obs]") %>% 
+  kable_classic_2()
+```
+
+#### Q4. 
+
+Answer the following, paying close attention to the units of measurement/type of variable:
+
+A) Interpret the coefficient on RSP in column 1.
+
+B) Given the change in the coefficient on RSP from column 1 to 2, what can we say about the relationship between RSP and inc?
+
+C) Test that age has no effect on net wealth using column 3.
+
+D) Interpret the effect on net wealth from a small change in income for those who earn about \$30,000.
+
+E) Interpret the R-squared in column 2.
+
+```{r}
+a <- coef(models[[1]])[2] %>% round(., digits = 2)
+c <- linearHypothesis(models[[3]], c("age","age_sq"), vcov. = sandwich)$`Pr(>F)` %>% round(., digits = 5)
+c2 <- ifelse(c[2] > 0.05, "fail to reject", "reject")
+d <- coef(models[[3]])["inc"] + 2 * coef(models[[3]])["inc_sq"] * 30
+d <- round(d, digits = 2)
+e <- summary(models[[2]])$r.squared * 100
+```
+
+Solution:
+
+A)  Individuals with an RSP have, on avagerae 16.32 thousand dollarrs in net weatlh compared to do those who don't.
+
+B)  The coefficient on RSP falls between columns. The OVB formula tells us that those with RSP have higher incomes (income and RSP) are positively related
+
+C)  The code for the test is above. The p-value is 0 indicating that we reject .
+
+```{=html}
+<!-- -->
+```
+d)  Using the formula for the marginal return to income, we get that an additionak unit of income is associated 0.26 in networth measured in 1000s - or about 260 dollars in additional savings.
+
+```{=html}
+<!-- -->
+```
+E)  RSP and income explain 9.99 percent of net worth.
+
+#### Q5. 
+
+Add an interaction term between male and RSP in model 3 from above, and interpret the result. Test whether or not an interaction term is needed.
+
+```{r}
+
+lm(NW ~ RSP*male + inc + inc_sq + marr +  age + age_sq + pira, data = df) %>% 
+  coeftest(., sandwich)
+
+```
+
+Solution:
+
+Adding an interaction term is simple, and the test of whether or not the model needs it can be directly seen by looking at the coeftest output -- its a simple t-test on the interaction. The coefficient tells us the differential impact of having an RSP for men compared to women.
+
+## The End. 
